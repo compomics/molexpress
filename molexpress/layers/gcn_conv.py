@@ -12,7 +12,7 @@ class GCNConv(BaseLayer):
         units: int,
         activation: keras.layers.Activation = None,
         use_bias: bool = True,
-        normalization: bool = False,
+        normalization: bool = True,
         skip_connection: bool = True,
         dropout_rate: float = 0,
         kernel_initializer: keras.initializers.Initializer = 'glorot_uniform',
