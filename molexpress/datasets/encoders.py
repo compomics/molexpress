@@ -2,28 +2,29 @@ import numpy as np
 from rdkit import Chem
 
 from molexpress import types
-from molexpress.datasets import features
 from molexpress.ops import chem_ops
-
+from molexpress import types
 
 
 class MolecularGraphEncoder:
 
     def __init__(
         self,
-        atom_featurizer: features.Featurizer,
-        bond_featurizer: features.Featurizer = None,
+        atom_featurizer: types.Featurizer,
+        bond_featurizer: types.Featurizer = None,
         self_loops: bool = False, 
-    ):
-        self.atom_encoder = _AtomEncoder(atom_featurizer)
-        self.bond_encoder = _BondEncoder(bond_featurizer, self_loops)
+    ) -> None:
+        self.node_encoder = MolecularNodeEncoder(atom_featurizer)
+        self.edge_encoder = MolecularEdgeEncoder(
+            bond_featurizer, self_loops=self_loops
+        )
 
-    def __call__(self, molecule: Chem.Mol | str) -> np.ndarray:
+    def __call__(
+        self, 
+        molecule: types.Molecule | types.SMILES | types.InChI
+    ) -> np.ndarray:
         molecule = chem_ops.get_molecule(molecule)
-        data = {}
-        data.update(self.atom_encoder(molecule))
-        data.update(self.bond_encoder(molecule))
-        return dict(**data)
+        return {**self.node_encoder(molecule), **self.edge_encoder(molecule)}
 
     @staticmethod
     def _collate_fn(
@@ -68,11 +69,11 @@ class MolecularGraphEncoder:
         return disjoint_graph, np.stack(y)
 
 
-class _BondEncoder:
+class MolecularEdgeEncoder:
 
     def __init__(
         self, 
-        featurizer: features.Featurizer, 
+        featurizer: types.Featurizer, 
         self_loops: bool = False
     ) -> None:
         self.featurizer = featurizer 
@@ -115,15 +116,13 @@ class _BondEncoder:
         }
     
 
-class _AtomEncoder:
+class MolecularNodeEncoder:
 
     def __init__(
         self, 
-        featurizer: features.Featurizer, 
+        featurizer: types.Featurizer, 
     ) -> None:
         self.featurizer = featurizer 
-        self.dim = featurizer.dim
-        self.dtype = featurizer.dtype
 
     def __call__(self, molecule: Chem.Mol) -> np.ndarray:
         node_encodings = np.stack([

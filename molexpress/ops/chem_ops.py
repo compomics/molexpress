@@ -1,9 +1,11 @@
 import numpy as np
 from rdkit import Chem 
 
+from molexpress import types
+
 
 def get_molecule(
-    molecule: Chem.Mol | str,
+    molecule: types.Molecule | types.SMILES | types.InChI,
     catch_errors: bool = False,
 ) -> Chem.Mol | None:
 
@@ -37,7 +39,7 @@ def get_molecule(
     return molecule
 
 def get_adjacency(
-    molecule: Chem.Mol,
+    molecule: types.Molecule,
     self_loops: bool = False,
     sparse: bool = True,
     dtype: str = 'int32',
@@ -45,7 +47,7 @@ def get_adjacency(
     
     """Computes the (sparse) adjacency matrix of the molecule"""
 
-    adjacency_matrix = Chem.GetAdjacencyMatrix(molecule)
+    adjacency_matrix: np.ndarray = Chem.GetAdjacencyMatrix(molecule)
 
     if self_loops:
         adjacency_matrix += np.eye(
