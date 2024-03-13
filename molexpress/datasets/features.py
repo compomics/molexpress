@@ -99,7 +99,7 @@ class Feature(ABC):
     features correspond to the (initial) node and edge states, respectively.
     """
 
-    def __init__(self, allowable_set, dtype):
+    def __init__(self, allowable_set=None, dtype='float32'):
         if allowable_set is None:
             allowable_set = ALLOWABLE_SETS.get(
                 self.__class__.__name__
@@ -156,7 +156,7 @@ class OneHotFeature(Feature):
     def call(self, inputs):
         pass
 
-
+    
 class FloatFeature(Feature):
 
     """Base class for scalar floating point features."""
@@ -179,67 +179,67 @@ class Hybridization(OneHotFeature):
         return inputs.GetHybridization().name
     
 
-class CIPCode(Feature):
+class CIPCode(OneHotFeature):
     def call(self, atom: Chem.Atom) -> str | None:
         if atom.HasProp("_CIPCode"):
             return atom.GetProp("_CIPCode")
         return 'None'
 
 
-class ChiralCenter(Feature):
+class ChiralCenter(FloatFeature):
     def call(self, atom: Chem.Atom) -> bool:
         return atom.HasProp("_ChiralityPossible")
 
 
-class FormalCharge(Feature):
+class FormalCharge(OneHotFeature):
     def call(self, atom: Chem.Atom) -> int:
         return atom.GetFormalCharge()
 
 
-class TotalNumHs(Feature):
+class TotalNumHs(OneHotFeature):
     def call(self, atom: Chem.Atom) -> int:
         return atom.GetTotalNumHs()
 
 
-class TotalValence(Feature):
+class TotalValence(OneHotFeature):
     def call(self, atom: Chem.Atom) -> int:
         return atom.GetTotalValence()
 
 
-class NumRadicalElectrons(Feature):
+class NumRadicalElectrons(OneHotFeature):
     def call(self, atom: Chem.Atom) -> int:
         return atom.GetNumRadicalElectrons()
 
 
-class Degree(Feature):
+class Degree(OneHotFeature):
     def call(self, atom: Chem.Atom) -> int:
         return atom.GetDegree()
 
 
-class Aromatic(Feature):
+class Aromatic(FloatFeature):
     def call(self, atom: Chem.Atom) -> bool:
         return atom.GetIsAromatic()
 
 
-class Hetero(Feature):
+class Hetero(FloatFeature):
     def call(self, atom: Chem.Atom) -> bool:
         mol = atom.GetOwningMol()
         return atom.GetIdx() in [i[0] for i in Lipinski._Heteroatoms(mol)]
 
 
-class HydrogenDonor(Feature):
+class HydrogenDonor(FloatFeature):
     def call(self, atom: Chem.Atom) -> bool:
         mol = atom.GetOwningMol()
         return atom.GetIdx() in [i[0] for i in Lipinski._HDonors(mol)]
 
 
-class HydrogenAcceptor(Feature):
+class HydrogenAcceptor(FloatFeature):
     def call(self, atom: Chem.Atom) -> bool:
         mol = atom.GetOwningMol()
         return atom.GetIdx() in [i[0] for i in Lipinski._HAcceptors(mol)]
 
 
-class RingSize(Feature):
+class RingSize(OneHotFeature):
     def call(self, atom: Chem.Atom) -> int:
         size = 0
         if atom.IsInRing():
@@ -248,7 +248,7 @@ class RingSize(Feature):
         return size
 
 
-class Ring(Feature):
+class Ring(FloatFeature):
     def call(self, atom: Chem.Atom) -> bool:
         return atom.IsInRing()
 
@@ -309,7 +309,7 @@ class Conjugated(OneHotFeature):
         return bond.GetIsConjugated()
 
 
-class Rotatable(OneHotFeature):
+class Rotatable(FloatFeature):
     def call(self, bond: Chem.Bond) -> bool:
         mol = bond.GetOwningMol()
         atom_indices = tuple(
