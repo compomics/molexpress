@@ -1,22 +1,22 @@
 import numpy as np
 from rdkit import Chem
 
-from molexpress import types
+from molexpress.datasets import featurizers
 from molexpress.ops import chem_ops
 from molexpress import types
-
+    
 
 class MolecularGraphEncoder:
 
     def __init__(
         self,
-        atom_featurizer: types.Featurizer,
-        bond_featurizer: types.Featurizer = None,
+        atom_featurizers: list[featurizers.Featurizer],
+        bond_featurizers: list[featurizers.Featurizer] = None,
         self_loops: bool = False, 
     ) -> None:
-        self.node_encoder = MolecularNodeEncoder(atom_featurizer)
+        self.node_encoder = MolecularNodeEncoder(atom_featurizers)
         self.edge_encoder = MolecularEdgeEncoder(
-            bond_featurizer, self_loops=self_loops
+            bond_featurizers, self_loops=self_loops
         )
 
     def __call__(
@@ -69,19 +69,50 @@ class MolecularGraphEncoder:
         return disjoint_graph, np.stack(y)
 
 
+class Composer:
+
+    """Wraps a list of featurizers.
+    
+    While a Featurizer encodes an atom or bond based on a single property,
+    the Composer encodes an atom or bond based on multiple properties.
+
+    Args:
+        featurizers:
+            List of featurizers.
+    """
+
+    def __init__(self, featurizers: list[featurizers.Featurizer]) -> None:
+        self.featurizers = featurizers
+        assert all(
+            self.featurizers[0].output_dtype == f.output_dtype 
+            for f in self.featurizers
+        ), "'dtype' of features need to be consistent."
+
+    def __call__(self, inputs: types.Atom | types.Bond) -> np.ndarray:
+        return np.concatenate([f(inputs) for f in self.featurizers])
+    
+    @property
+    def output_dim(self):
+        return sum(f.output_dim for f in self.featurizers)
+
+    @property
+    def output_dtype(self):
+        return self.featurizers[0].output_dtype
+    
+
 class MolecularEdgeEncoder:
 
     def __init__(
         self, 
-        featurizer: types.Featurizer, 
+        featurizers: list[featurizers.Featurizer], 
         self_loops: bool = False
     ) -> None:
-        self.featurizer = featurizer 
+        self.featurizer = Composer(featurizers) 
         self.self_loops = self_loops
-        self.dim = featurizer.dim
-        self.dtype = featurizer.dtype
+        self.output_dim = self.featurizer.output_dim
+        self.output_dtype = self.featurizer.output_dtype
 
-    def __call__(self, molecule: Chem.Mol) -> np.ndarray:
+    def __call__(self, molecule: types.Molecule) -> np.ndarray:
 
         edge_src, edge_dst = chem_ops.get_adjacency(
             molecule, self_loops=self.self_loops)
@@ -90,7 +121,7 @@ class MolecularEdgeEncoder:
             return {'edge_src': edge_src, 'edge_dst': edge_dst}
 
         if molecule.GetNumBonds() == 0:
-            return np.zeros((0, self.dim), dtype=self.dtype)
+            return np.zeros((0, self.output_dim), dtype=self.output_dtype)
         
         bond_encodings = []
 
@@ -100,7 +131,9 @@ class MolecularEdgeEncoder:
 
             if bond is None:
                 assert self.self_loops, "Found a bond to be None."
-                bond_encoding = np.zeros(self.dim + 1, dtype=self.dtype)
+                bond_encoding = np.zeros(
+                    self.output_dim + 1, dtype=self.output_dtype
+                )
                 bond_encoding[-1] = 1
             else:
                 bond_encoding = self.featurizer(bond)
@@ -120,11 +153,11 @@ class MolecularNodeEncoder:
 
     def __init__(
         self, 
-        featurizer: types.Featurizer, 
+        featurizers: list[featurizers.Featurizer], 
     ) -> None:
-        self.featurizer = featurizer 
+        self.featurizer = Composer(featurizers) 
 
-    def __call__(self, molecule: Chem.Mol) -> np.ndarray:
+    def __call__(self, molecule: types.Molecule) -> np.ndarray:
         node_encodings = np.stack([
             self.featurizer(atom) for atom in molecule.GetAtoms()
         ], axis=0)

@@ -60,71 +60,43 @@ DEFAULT_VOCABULARY = {
 }
 
 
-class Compose:
+class Featurizer(ABC):
 
-    """Wraps a list of features to featurize an atom or bond.
+    """Abstract featurizer.
     
-    While a Feature encodes an atom or bond based on a single feature,
-    Compose encodes an atom or bond based on multiple features.
-
-    Args:
-        features:
-            List of features.
+    Featurizes a single atom or bond based on a single property.
     """
 
-    def __init__(self, features: list['Feature']) -> None:
-        self.features = features
-        assert all(
-            self.features[0].dtype == f.dtype for f in self.features
-        ), "'dtype' of features need to be consistent."
-
-    def __call__(self, inputs: types.Atom | types.Bond) -> np.ndarray:
-        return np.concatenate([
-            feature(inputs) for feature in self.features
-        ])
-    
-    @property
-    def dim(self):
-        return sum(feature.dim for feature in self.features)
-
-    @property
-    def dtype(self):
-        return self.features[0].dtype
-    
-
-class Feature(ABC):
-
-    """Abstract feature.
-    
-    Represents a single feature of an atom or bond.
-    """
-
-    def __init__(self, dim: int = None, dtype: str = 'float32') -> None:
-        self._dim = int(dim) if dim is not None else 1
-        self._dtype = dtype
+    def __init__(
+        self, 
+        output_dim: int = None, 
+        output_dtype: str = 'float32'
+    ) -> None:
+        self._output_dim = int(output_dim) if output_dim is not None else 1
+        self._output_dtype = output_dtype
     
     @abstractmethod
     def call(self, x: types.Atom | types.Bond) -> types.Scalar:
         pass
 
     @property
-    def dim(self) -> int:
-        return self._dim
+    def output_dim(self) -> int:
+        return self._output_dim
 
     @property
-    def dtype(self) -> str:
-        return self._dtype
+    def output_dtype(self) -> str:
+        return self._output_dtype
 
 
-class OneHotFeature(Feature):
+class OneHotFeaturizer(Featurizer):
 
-    """Abstract one-hot feature."""
+    """Abstract one-hot featurizer."""
 
     def __init__(
         self,
         vocab: list[str] | list[int] = None, 
         oov: bool = False,
-        dtype: str = 'float32',
+        output_dtype: str = 'float32',
     ):
         if not vocab:
             vocab = DEFAULT_VOCABULARY.get(self.__class__.__name__)
@@ -136,14 +108,14 @@ class OneHotFeature(Feature):
         self.oov = oov
 
         super().__init__(
-            dim=len(self.vocab) + int(self.oov), 
-            dtype=dtype
+            output_dim=len(self.vocab) + int(self.oov), 
+            output_dtype=output_dtype
         )
 
         if self.oov:
             self.vocab += ['<oov>']
             
-        encodings = np.eye(self.dim, dtype=self.dtype)
+        encodings = np.eye(self.output_dim, dtype=self.output_dtype)
         self.mapping = dict(zip(self.vocab, encodings))
     
     def __call__(self, x: types.Atom | types.Bond) -> np.ndarray:
@@ -153,88 +125,88 @@ class OneHotFeature(Feature):
         )
         if encoding is not None:
             return encoding
-        return np.zeros([self.dim], dtype=self.dtype)
+        return np.zeros([self.output_dim], dtype=self.output_dtype)
 
     
-class FloatFeature(Feature):
+class FloatFeaturizer(Featurizer):
 
-    """Abstract scalar floating point feature."""
+    """Abstract scalar floating point featurizer."""
 
     def __call__(self, x: types.Atom | types.Bond) -> np.ndarray:
-        return np.array([self.call(x)], dtype=self.dtype)
+        return np.array([self.call(x)], dtype=self.output_dtype)
 
 
-class AtomType(OneHotFeature):
+class AtomType(OneHotFeaturizer):
     def call(self, inputs: types.Atom) -> str:
         return inputs.GetSymbol() 
 
 
-class Hybridization(OneHotFeature):
+class Hybridization(OneHotFeaturizer):
     def call(self, inputs: types.Atom) -> str:
         return inputs.GetHybridization().name.lower()
     
 
-class CIPCode(OneHotFeature):
+class CIPCode(OneHotFeaturizer):
     def call(self, atom: types.Atom) -> str | None:
         if atom.HasProp("_CIPCode"):
             return atom.GetProp("_CIPCode")
         return 'None'
 
 
-class ChiralCenter(FloatFeature):
+class ChiralCenter(FloatFeaturizer):
     def call(self, atom: types.Atom) -> bool:
         return atom.HasProp("_ChiralityPossible")
 
 
-class FormalCharge(OneHotFeature):
+class FormalCharge(OneHotFeaturizer):
     def call(self, atom: types.Atom) -> int:
         return atom.GetFormalCharge()
 
 
-class TotalNumHs(OneHotFeature):
+class TotalNumHs(OneHotFeaturizer):
     def call(self, atom: types.Atom) -> int:
         return atom.GetTotalNumHs()
 
 
-class TotalValence(OneHotFeature):
+class TotalValence(OneHotFeaturizer):
     def call(self, atom: types.Atom) -> int:
         return atom.GetTotalValence()
 
 
-class NumRadicalElectrons(OneHotFeature):
+class NumRadicalElectrons(OneHotFeaturizer):
     def call(self, atom: types.Atom) -> int:
         return atom.GetNumRadicalElectrons()
 
 
-class Degree(OneHotFeature):
+class Degree(OneHotFeaturizer):
     def call(self, atom: types.Atom) -> int:
         return atom.GetDegree()
 
 
-class Aromatic(FloatFeature):
+class Aromatic(FloatFeaturizer):
     def call(self, atom: types.Atom) -> bool:
         return atom.GetIsAromatic()
 
 
-class Hetero(FloatFeature):
+class Hetero(FloatFeaturizer):
     def call(self, atom: types.Atom) -> bool:
         mol = atom.GetOwningMol()
         return atom.GetIdx() in [i[0] for i in Lipinski._Heteroatoms(mol)]
 
 
-class HydrogenDonor(FloatFeature):
+class HydrogenDonor(FloatFeaturizer):
     def call(self, atom: types.Atom) -> bool:
         mol = atom.GetOwningMol()
         return atom.GetIdx() in [i[0] for i in Lipinski._HDonors(mol)]
 
 
-class HydrogenAcceptor(FloatFeature):
+class HydrogenAcceptor(FloatFeaturizer):
     def call(self, atom: types.Atom) -> bool:
         mol = atom.GetOwningMol()
         return atom.GetIdx() in [i[0] for i in Lipinski._HAcceptors(mol)]
 
 
-class RingSize(OneHotFeature):
+class RingSize(OneHotFeaturizer):
     def call(self, atom: types.Atom) -> int:
         size = 0
         if atom.IsInRing():
@@ -243,12 +215,12 @@ class RingSize(OneHotFeature):
         return size
 
 
-class Ring(FloatFeature):
+class Ring(FloatFeaturizer):
     def call(self, atom: types.Atom) -> bool:
         return atom.IsInRing()
 
 
-class CrippenLogPContribution(FloatFeature):
+class CrippenLogPContribution(FloatFeaturizer):
     def call(self, atom: types.Atom) -> float:
         mol = atom.GetOwningMol()
         val = Crippen._GetAtomContribs(mol)[atom.GetIdx()][0]
@@ -257,7 +229,7 @@ class CrippenLogPContribution(FloatFeature):
         return 0.0
 
 
-class CrippenMolarRefractivityContribution(FloatFeature):
+class CrippenMolarRefractivityContribution(FloatFeaturizer):
     def call(self, atom: types.Atom) -> float:
         mol = atom.GetOwningMol()
         val = Crippen._GetAtomContribs(mol)[atom.GetIdx()][1]
@@ -266,7 +238,7 @@ class CrippenMolarRefractivityContribution(FloatFeature):
         return 0.0
 
 
-class TPSAContribution(FloatFeature):
+class TPSAContribution(FloatFeaturizer):
     def call(self, atom: types.Atom) -> float:
         mol = atom.GetOwningMol()
         val = rdMolDescriptors._CalcTPSAContribs(mol)[atom.GetIdx()]
@@ -275,7 +247,7 @@ class TPSAContribution(FloatFeature):
         return 0.0
 
 
-class LabuteASAContribution(FloatFeature):
+class LabuteASAContribution(FloatFeaturizer):
     def call(self, atom: types.Atom) -> float:
         mol = atom.GetOwningMol()
         val = rdMolDescriptors._CalcLabuteASAContribs(mol)[0][atom.GetIdx()]
@@ -284,7 +256,7 @@ class LabuteASAContribution(FloatFeature):
         return 0.0
 
 
-class GasteigerCharge(FloatFeature):
+class GasteigerCharge(FloatFeaturizer):
     def call(self, atom: types.Atom) -> float:
         mol = atom.GetOwningMol()
         rdPartialCharges.ComputeGasteigerCharges(mol)
@@ -294,22 +266,22 @@ class GasteigerCharge(FloatFeature):
         return 0.0
 
 
-class BondType(OneHotFeature):
+class BondType(OneHotFeaturizer):
     def call(self, bond: types.Bond) -> str:
         return bond.GetBondType().name.lower()
 
 
-class Stereo(OneHotFeature):
+class Stereo(OneHotFeaturizer):
     def call(self, bond: types.Bond) -> str:
         return bond.GetStereo().name.lower()
     
 
-class Conjugated(FloatFeature):
+class Conjugated(FloatFeaturizer):
     def call(self, bond: types.Bond) -> bool:
         return bond.GetIsConjugated()
 
 
-class Rotatable(FloatFeature):
+class Rotatable(FloatFeaturizer):
     def call(self, bond: types.Bond) -> bool:
         mol = bond.GetOwningMol()
         atom_indices = tuple(
