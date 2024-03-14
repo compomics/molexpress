@@ -65,6 +65,10 @@ class BaseLayer(keras.layers.Layer):
         output_shape['node_state'] = (
             *input_shape['node_state'][:-1], self.units
         )
+        if input_shape['edge_state'] is not None:
+            output_shape['edge_state'] = (
+                *input_shape['edge_state'][:-1], self.units
+            )
         return output_shape
 
     def add_kernel(
