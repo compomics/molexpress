@@ -122,7 +122,7 @@ class MolecularEdgeEncoder:
 
         if molecule.GetNumBonds() == 0:
             edge_state = np.zeros(
-                shape=(0, self.output_dim), 
+                shape=(0, self.output_dim + int(self.self_loops)), 
                 dtype=self.output_dtype
             )
             return {
