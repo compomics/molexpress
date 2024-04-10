@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import numpy as np
-from rdkit import Chem 
+from rdkit import Chem
 
 from molexpress import types
 
@@ -14,7 +16,7 @@ def get_molecule(
     if isinstance(molecule, Chem.Mol):
         return molecule
 
-    string = molecule 
+    string = molecule
 
     if string.startswith('InChI'):
         molecule = Chem.MolFromInchi(string, sanitize=False)
@@ -28,7 +30,7 @@ def get_molecule(
     if flag != Chem.SanitizeFlags.SANITIZE_NONE:
         if not catch_errors:
             return None
-        # Sanitize molecule again, without the sanitization step that caused 
+        # Sanitize molecule again, without the sanitization step that caused
         # the error previously. Unrealistic molecules might pass without an error.
         Chem.SanitizeMol(
             molecule, sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL^flag)
@@ -44,7 +46,7 @@ def get_adjacency(
     sparse: bool = True,
     dtype: str = 'int32',
 ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
-    
+
     """Computes the (sparse) adjacency matrix of the molecule"""
 
     adjacency_matrix: np.ndarray = Chem.GetAdjacencyMatrix(molecule)

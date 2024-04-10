@@ -1,4 +1,6 @@
-import keras 
+from __future__ import annotations
+
+import keras
 
 from molexpress import types
 from molexpress.ops import gnn_ops
@@ -36,13 +38,13 @@ class GINConv(BaseLayer):
             kernel_constraint=kernel_constraint,
             bias_constraint=bias_constraint,
             **kwargs,
-        ) 
+        )
         self.dropout_rate = dropout_rate
         self.skip_connection = skip_connection
         self.normalization = normalization
 
     def build(
-        self, 
+        self,
         input_shape: dict[str, tuple[int, ...]]
     ) -> None:
         node_state_shape = input_shape['node_state']
@@ -51,7 +53,7 @@ class GINConv(BaseLayer):
         node_dim = node_state_shape[-1]
         if edge_state_shape is not None:
             edge_dim = edge_state_shape[-1]
-        
+
         self._transform_node_state = node_dim != self.units
 
         if self._transform_node_state:
@@ -81,7 +83,7 @@ class GINConv(BaseLayer):
         self.epsilon = self.add_weight(
             name='epsilon', shape=(), initializer='zeros'
         )
-    
+
         if self.normalization:
             self.normalize = keras.layers.BatchNormalization()
 
@@ -101,8 +103,8 @@ class GINConv(BaseLayer):
 
         if edge_state is not None and self._transform_edge_state:
             edge_state = gnn_ops.transform(
-                state=edge_state, 
-                kernel=self.special_edge_kernel, 
+                state=edge_state,
+                kernel=self.special_edge_kernel,
                 bias=None
             )
 
@@ -114,18 +116,18 @@ class GINConv(BaseLayer):
             )
 
         node_state_updated = gnn_ops.aggregate(
-            node_state=node_state, 
-            edge_src=edge_src, 
-            edge_dst=edge_dst, 
-            edge_state=edge_state, 
+            node_state=node_state,
+            edge_src=edge_src,
+            edge_dst=edge_dst,
+            edge_state=edge_state,
             edge_weight=edge_weight
         )
-            
+
         node_state_updated += (1 + self.epsilon) * node_state
 
         node_state_updated = gnn_ops.transform(
             state=node_state_updated,
-            kernel=self.node_kernel_1, 
+            kernel=self.node_kernel_1,
             bias=self.node_bias_1
         )
 
@@ -136,7 +138,7 @@ class GINConv(BaseLayer):
 
         node_state_updated = gnn_ops.transform(
             state=node_state_updated,
-            kernel=self.node_kernel_2, 
+            kernel=self.node_kernel_2,
             bias=self.node_bias_2
         )
 
@@ -150,7 +152,7 @@ class GINConv(BaseLayer):
             node_state_updated = self.dropout(node_state_updated)
 
         return dict(node_state=node_state_updated, **x)
-    
+
     def get_config(self) -> dict[str, types.Any]:
         config = super().get_config()
         config.update({

@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import keras
 
-from molexpress import types 
+from molexpress import types
 
 
 class BaseLayer(keras.layers.Layer):
@@ -8,7 +10,7 @@ class BaseLayer(keras.layers.Layer):
     """Base layer."""
 
     def __init__(
-        self, 
+        self,
         units: int,
         activation: keras.layers.Activation = None,
         use_bias: bool = True,
@@ -58,7 +60,7 @@ class BaseLayer(keras.layers.Layer):
         return config
 
     def compute_output_shape(
-        self, 
+        self,
         input_shape: dict[str, tuple[int, ...]]
     ) -> dict[str, tuple[int, ...]]:
         output_shape = input_shape
@@ -73,9 +75,9 @@ class BaseLayer(keras.layers.Layer):
 
     def add_kernel(
         self,
-        name: str, 
-        shape: tuple[int, ...], 
-        dtype: str = 'float32', 
+        name: str,
+        shape: tuple[int, ...],
+        dtype: str = 'float32',
         **kwargs
     ) -> types.Variable:
         return self.add_weight(
@@ -85,12 +87,12 @@ class BaseLayer(keras.layers.Layer):
             **self._common_weight_kwargs('kernel'),
             **kwargs,
         )
-    
+
     def add_bias(
-        self, 
-        name: str, 
-        shape: tuple[int, ...] = None, 
-        dtype: str = 'float32', 
+        self,
+        name: str,
+        shape: tuple[int, ...] = None,
+        dtype: str = 'float32',
         **kwargs
     ) -> types.Variable:
         return self.add_weight(
@@ -102,7 +104,7 @@ class BaseLayer(keras.layers.Layer):
         )
 
     def _common_weight_kwargs(
-        self, 
+        self,
         weight_type: str
     ) -> dict[str, types.Any]:
         initializer = getattr(self, f"{weight_type}_initializer", None)
@@ -119,4 +121,3 @@ class BaseLayer(keras.layers.Layer):
             'regularizer': regularizer,
             'constraint': constraint,
         }
-    

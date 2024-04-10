@@ -1,4 +1,6 @@
-from abc import ABC 
+from __future__ import annotations
+
+from abc import ABC
 from abc import abstractmethod
 
 from rdkit.Chem import Lipinski
@@ -63,18 +65,18 @@ DEFAULT_VOCABULARY = {
 class Featurizer(ABC):
 
     """Abstract featurizer.
-    
+
     Featurizes a single atom or bond based on a single property.
     """
 
     def __init__(
-        self, 
-        output_dim: int = None, 
+        self,
+        output_dim: int = None,
         output_dtype: str = 'float32'
     ) -> None:
         self._output_dim = int(output_dim) if output_dim is not None else 1
         self._output_dtype = output_dtype
-    
+
     @abstractmethod
     def call(self, x: types.Atom | types.Bond) -> types.Scalar:
         pass
@@ -94,7 +96,7 @@ class OneHotFeaturizer(Featurizer):
 
     def __init__(
         self,
-        vocab: list[str] | list[int] = None, 
+        vocab: list[str] | list[int] = None,
         oov: bool = False,
         output_dtype: str = 'float32',
     ):
@@ -102,22 +104,22 @@ class OneHotFeaturizer(Featurizer):
             vocab = DEFAULT_VOCABULARY.get(self.__class__.__name__)
             if vocab is None:
                 raise ValueError("Need to supply a 'vocab'.")
-        
-        self.vocab = list(vocab) 
+
+        self.vocab = list(vocab)
         self.vocab.sort(key=lambda x: x if x is not None else "")
         self.oov = oov
 
         super().__init__(
-            output_dim=len(self.vocab) + int(self.oov), 
+            output_dim=len(self.vocab) + int(self.oov),
             output_dtype=output_dtype
         )
 
         if self.oov:
             self.vocab += ['<oov>']
-            
+
         encodings = np.eye(self.output_dim, dtype=self.output_dtype)
         self.mapping = dict(zip(self.vocab, encodings))
-    
+
     def __call__(self, x: types.Atom | types.Bond) -> np.ndarray:
         feature = self.call(x)
         encoding = self.mapping.get(
@@ -127,7 +129,7 @@ class OneHotFeaturizer(Featurizer):
             return encoding
         return np.zeros([self.output_dim], dtype=self.output_dtype)
 
-    
+
 class FloatFeaturizer(Featurizer):
 
     """Abstract scalar floating point featurizer."""
@@ -138,13 +140,13 @@ class FloatFeaturizer(Featurizer):
 
 class AtomType(OneHotFeaturizer):
     def call(self, inputs: types.Atom) -> str:
-        return inputs.GetSymbol() 
+        return inputs.GetSymbol()
 
 
 class Hybridization(OneHotFeaturizer):
     def call(self, inputs: types.Atom) -> str:
         return inputs.GetHybridization().name.lower()
-    
+
 
 class CIPCode(OneHotFeaturizer):
     def call(self, atom: types.Atom) -> str | None:
@@ -274,7 +276,7 @@ class BondType(OneHotFeaturizer):
 class Stereo(OneHotFeaturizer):
     def call(self, bond: types.Bond) -> str:
         return bond.GetStereo().name.lower()
-    
+
 
 class Conjugated(FloatFeaturizer):
     def call(self, bond: types.Bond) -> bool:

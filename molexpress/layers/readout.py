@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import keras
 
 from molexpress import types
-from molexpress.ops import gnn_ops 
+from molexpress.ops import gnn_ops
 
 
 class Readout(keras.layers.Layer):
@@ -10,7 +12,7 @@ class Readout(keras.layers.Layer):
         super().__init__(**kwargs)
         self.mode = mode
         if self.mode == 'max':
-            self._readout_fn = keras.ops.segment_max 
+            self._readout_fn = keras.ops.segment_max
         elif self.mode == 'sum':
             self._readout_fn = keras.ops.segment_sum
         else:
@@ -27,5 +29,5 @@ class Readout(keras.layers.Layer):
             data=inputs['node_state'],
             segment_ids=graph_indicator,
             num_segments=None,
-            sorted=False, 
+            sorted=False,
         )
