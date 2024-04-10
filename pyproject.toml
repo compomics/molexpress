@@ -27,7 +27,7 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
 ]
 requires-python = ">=3.10.6"
-dependencies = ["rdkit>=2023.9.5", "keras>=3", "torch", "numpy"]
+dependencies = ["rdkit>=2023.9.5", "keras>=3", "numpy"]
 
 [project.urls]
 homepage = "https://github.com/compomics/molexpress"
