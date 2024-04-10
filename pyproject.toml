@@ -26,7 +26,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: POSIX :: Linux",
 ]
-requires-python = ">=3.10.6"
+requires-python = ">=3.8"
 dependencies = ["rdkit>=2023.9.5", "keras>=3", "numpy"]
 
 [project.urls]
@@ -35,3 +35,14 @@ homepage = "https://github.com/compomics/molexpress"
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
+
+[tool.isort]
+profile = "black"
+
+[tool.black]
+line-length = 99
+target-version = ['py38']
+
+[tool.ruff]
+line-length = 99
+target-version = 'py38'
