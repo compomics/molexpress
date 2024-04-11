@@ -1,9 +1,9 @@
 [project]
 name = "molexpress"
-version = "0.1.0"
-description = "Graph Neural Networks with Keras 3."
+description = "Graph Neural Networks for molecules with Keras 3."
 readme = "README.md"
 license = { file = "LICENSE" }
+dynamic = ["version"]
 authors = [
     { name = "Alexander Kensert", email = "alexander.kensert@gmail.com" },
 ]
@@ -29,6 +29,9 @@ classifiers = [
 requires-python = ">=3.9"
 dependencies = ["rdkit>=2023.9.5", "keras>=3", "numpy"]
 
+[project.optional-dependencies]
+dev = ["ruff", "isort"]
+
 [project.urls]
 homepage = "https://github.com/compomics/molexpress"
 
@@ -42,10 +45,9 @@ packages = ["molexpress"]
 [tool.isort]
 profile = "black"
 
-[tool.black]
-line-length = 99
-target-version = ['py38']
-
 [tool.ruff]
 line-length = 99
-target-version = 'py38'
+target-version = 'py39'
+
+[tool.ruff.format]
+docstring-code-format = true
