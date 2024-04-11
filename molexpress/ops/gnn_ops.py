@@ -29,6 +29,7 @@ def transform(
         state_transformed += bias
     return state_transformed
 
+
 def aggregate(
     node_state: types.Array,
     edge_src: types.Array,
@@ -64,9 +65,7 @@ def aggregate(
         edge_src = keras.ops.expand_dims(edge_src, axis=-1)
         edge_dst = keras.ops.expand_dims(edge_dst, axis=-1)
 
-    node_state_src  = keras.ops.take_along_axis(
-        node_state, edge_src, axis=0
-    )
+    node_state_src = keras.ops.take_along_axis(node_state, edge_src, axis=0)
     if edge_weight is not None:
         node_state_src *= edge_weight
 
@@ -76,18 +75,16 @@ def aggregate(
     edge_dst = keras.ops.squeeze(edge_dst, axis=-1)
 
     node_state_updated = keras.ops.segment_sum(
-        data=node_state_src,
-        segment_ids=edge_dst,
-        num_segments=num_nodes,
-        sorted=False
+        data=node_state_src, segment_ids=edge_dst, num_segments=num_nodes, sorted=False
     )
     return node_state_updated
+
 
 def segment_mean(
     data: types.Array,
     segment_ids: types.Array,
     num_segments: int = None,
-    sorted: bool = False
+    sorted: bool = False,
 ) -> types.Array:
     """Performs a mean of data based on segment indices.
 
@@ -108,9 +105,6 @@ def segment_mean(
         New data that has been reduced.
     """
     x = keras.ops.segment_sum(
-        data=data,
-        segment_ids=segment_ids,
-        num_segments=num_segments,
-        sorted=sorted
+        data=data, segment_ids=segment_ids, num_segments=num_segments, sorted=sorted
     )
     return x / keras.ops.cast(keras.ops.bincount(segment_ids), x.dtype)[:, None]
