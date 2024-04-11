@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import numpy as np
-from rdkit import Chem
 
 from molexpress import types
 from molexpress.datasets import featurizers
