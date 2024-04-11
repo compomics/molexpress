@@ -103,7 +103,10 @@ class MolecularEdgeEncoder:
             return {"edge_src": edge_src, "edge_dst": edge_dst}
 
         if molecule.GetNumBonds() == 0:
-            edge_state = np.zeros(shape=(0, self.output_dim), dtype=self.output_dtype)
+            edge_state = np.zeros(
+                shape=(0, self.output_dim + int(self.self_loops)),
+                dtype=self.output_dtype
+            )
             return {
                 "edge_src": edge_src,
                 "edge_dst": edge_dst,
