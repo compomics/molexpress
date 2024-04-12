@@ -1,15 +1,17 @@
-import keras 
+from __future__ import annotations
 
-from molexpress import types 
+import keras
+
+from molexpress import types
 
 
 def transform(
-    state, 
+    state,
     kernel: types.Variable,
     bias: types.Variable = None,
-) -> types.Array: 
+) -> types.Array:
     """Transforms node or edge states via learnable weights.
-    
+
     Args:
         state:
             The current node or edge states to be updated.
@@ -17,16 +19,17 @@ def transform(
             The learnable kernel.
         bias:
             The learnable bias.
-    
+
     Returns:
         A transformed node state.
     """
 
     state_transformed = keras.ops.matmul(state, kernel)
     if bias is not None:
-        state_transformed += bias 
+        state_transformed += bias
     return state_transformed
- 
+
+
 def aggregate(
     node_state: types.Array,
     edge_src: types.Array,
@@ -35,16 +38,16 @@ def aggregate(
     edge_weight: types.Array = None,
 ) -> types.Array:
     """Aggregates node states based on edges.
-    
+
     Given node A with edges AB and AC, the information (states) of nodes
     B and C will be passed to node A.
 
     Args:
-        node_state: 
+        node_state:
             The current state of the nodes.
         edge_src:
             The indices of the source nodes.
-        edge_dst: 
+        edge_dst:
             The indices of the destination nodes.
         edge_state:
             Optional edge states.
@@ -56,39 +59,35 @@ def aggregate(
     """
     num_nodes = keras.ops.shape(node_state)[0]
 
-    expected_rank = 2 
+    expected_rank = 2
     current_rank = len(keras.ops.shape(edge_src))
     for _ in range(expected_rank - current_rank):
         edge_src = keras.ops.expand_dims(edge_src, axis=-1)
         edge_dst = keras.ops.expand_dims(edge_dst, axis=-1)
-        
-    node_state_src  = keras.ops.take_along_axis(
-        node_state, edge_src, axis=0
-    )
+
+    node_state_src = keras.ops.take_along_axis(node_state, edge_src, axis=0)
     if edge_weight is not None:
-        node_state_src *= edge_weight 
+        node_state_src *= edge_weight
 
     if edge_state is not None:
-        node_state_src += edge_state 
+        node_state_src += edge_state
 
     edge_dst = keras.ops.squeeze(edge_dst, axis=-1)
 
     node_state_updated = keras.ops.segment_sum(
-        data=node_state_src,
-        segment_ids=edge_dst,
-        num_segments=num_nodes,
-        sorted=False
+        data=node_state_src, segment_ids=edge_dst, num_segments=num_nodes, sorted=False
     )
     return node_state_updated
+
 
 def segment_mean(
     data: types.Array,
     segment_ids: types.Array,
     num_segments: int = None,
-    sorted: bool = False
+    sorted: bool = False,
 ) -> types.Array:
     """Performs a mean of data based on segment indices.
-    
+
     A permutation invariant reduction of the node states to obtain an
     encoding of the graph.
 
@@ -106,9 +105,6 @@ def segment_mean(
         New data that has been reduced.
     """
     x = keras.ops.segment_sum(
-        data=data,
-        segment_ids=segment_ids,
-        num_segments=num_segments,
-        sorted=sorted
-    ) 
+        data=data, segment_ids=segment_ids, num_segments=num_segments, sorted=sorted
+    )
     return x / keras.ops.cast(keras.ops.bincount(segment_ids), x.dtype)[:, None]

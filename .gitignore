@@ -1,5 +1,8 @@
 notebooks/_*.ipynb
 
+# vscode
+.vscode
+
 # jupyter
 MANIFEST
 build
