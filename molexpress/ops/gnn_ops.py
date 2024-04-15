@@ -59,6 +59,10 @@ def aggregate(
     """
     num_nodes = keras.ops.shape(node_state)[0]
 
+    # Instead of casting to int, throw an error if not int?
+    edge_src = keras.ops.cast(edge_src, "int32")
+    edge_dst = keras.ops.cast(edge_dst, "int32")
+
     expected_rank = 2
     current_rank = len(keras.ops.shape(edge_src))
     for _ in range(expected_rank - current_rank):
