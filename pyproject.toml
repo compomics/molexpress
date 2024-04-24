@@ -39,8 +39,11 @@ homepage = "https://github.com/compomics/molexpress"
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-packages = ["molexpress"]
+[tool.setuptools.dynamic]
+version = { attr = "molexpress.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["molexpress*"]
 
 [tool.isort]
 profile = "black"
