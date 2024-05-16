@@ -1,3 +1,4 @@
+lightning_logs/
 notebooks/_*.ipynb
 
 # vscode
