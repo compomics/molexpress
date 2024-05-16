@@ -126,7 +126,7 @@ class GINConv(BaseLayer):
             node_state_updated = self.activation(node_state_updated)
 
         if self.skip_connection:
-            node_state_updated += node_state
+            node_state_updated = node_state_updated + node_state
 
         if self.dropout_rate:
             node_state_updated = self.dropout(node_state_updated)
