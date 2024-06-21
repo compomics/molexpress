@@ -16,9 +16,12 @@ class PeptideGraphEncoder:
         atom_featurizers: list[featurizers.Featurizer],
         bond_featurizers: list[featurizers.Featurizer] = None,
         self_loops: bool = False,
+        supports_masking: bool = False,
     ) -> None:
-        self.node_encoder = MolecularNodeEncoder(atom_featurizers)
-        self.edge_encoder = MolecularEdgeEncoder(bond_featurizers, self_loops=self_loops)
+        self.node_encoder = MolecularNodeEncoder(
+            atom_featurizers, supports_masking=supports_masking)
+        self.edge_encoder = MolecularEdgeEncoder(
+            bond_featurizers, self_loops=self_loops, supports_masking=supports_masking)
 
     def __call__(self, residues: list[types.Molecule | types.SMILES | types.InChI]) -> np.ndarray:
         residue_graphs = []
@@ -77,6 +80,45 @@ class PeptideGraphEncoder:
             return disjoint_peptide_batch_graph
         else:
             return disjoint_peptide_batch_graph, np.stack(y)
+
+    @staticmethod
+    def masked_collate_fn(
+        data: list[types.MolecularGraph],
+        node_masking_rate: float = 0.25,
+        edge_masking_rate: float = 0.25,
+    ) -> tuple[types.MolecularGraph, np.ndarray]:
+        """
+        Merge list of graphs into a single disjoint graph.
+
+        Data can be a list of MolecularGraphs or a list of tuples where the first element is a
+        MolecularGraph and the second element is a label.
+
+        """
+        disjoint_peptide_graphs = data
+
+        disjoint_peptide_batch_graph = PeptideGraphEncoder._merge_molecular_graphs(
+            disjoint_peptide_graphs
+        )
+
+        node_state = disjoint_peptide_batch_graph['node_state']
+        node_mask = np.random.uniform(size=node_state.shape[0]) < node_masking_rate
+        disjoint_peptide_batch_graph['node_loss_weight'] = np.copy(node_mask.astype(node_state.dtype))
+        disjoint_peptide_batch_graph['node_label'] = np.copy(disjoint_peptide_batch_graph['node_state'])
+        mask_state = np.zeros_like(node_state)
+        mask_state[:, -1] = 1.
+        disjoint_peptide_batch_graph['node_state'] = np.where(
+            node_mask[:, None], mask_state, node_state)
+        
+        edge_state = disjoint_peptide_batch_graph['edge_state']
+        edge_mask = np.random.uniform(size=edge_state.shape[0]) < edge_masking_rate
+        disjoint_peptide_batch_graph['edge_loss_weight'] = np.copy(edge_mask.astype(edge_state.dtype))
+        disjoint_peptide_batch_graph['edge_label'] = np.copy(disjoint_peptide_batch_graph['edge_state'])
+        mask_state = np.zeros_like(edge_state)
+        mask_state[:, -1] = 1.
+        disjoint_peptide_batch_graph['edge_state'] = np.where(
+            edge_mask[:, None], mask_state, edge_state)
+            
+        return disjoint_peptide_batch_graph
 
     @staticmethod
     def _merge_molecular_graphs(
@@ -139,10 +181,14 @@ class Composer:
 
 class MolecularEdgeEncoder:
     def __init__(
-        self, featurizers: list[featurizers.Featurizer], self_loops: bool = False
+        self, 
+        featurizers: list[featurizers.Featurizer], 
+        self_loops: bool = False, 
+        supports_masking: bool = False,
     ) -> None:
         self.featurizer = Composer(featurizers)
         self.self_loops = self_loops
+        self.supports_masking = supports_masking
         self.output_dim = self.featurizer.output_dim
         self.output_dtype = self.featurizer.output_dtype
 
@@ -170,12 +216,14 @@ class MolecularEdgeEncoder:
 
             if bond is None:
                 assert self.self_loops, "Found a bond to be None."
-                bond_encoding = np.zeros(self.output_dim + 1, dtype=self.output_dtype)
-                bond_encoding[-1] = 1
+                bond_encoding = np.zeros(
+                    self.output_dim + int(self.self_loops) + int(self.supports_masking), 
+                    dtype=self.output_dtype)
+                bond_encoding[-(int(self.self_loops) + int(self.supports_masking))] = 1
             else:
                 bond_encoding = self.featurizer(bond)
-                if self.self_loops:
-                    bond_encoding = np.pad(bond_encoding, (0, 1))
+                bond_encoding = np.pad(
+                    bond_encoding, (0, int(self.self_loops) + int(self.supports_masking)))
 
             bond_encodings.append(bond_encoding)
 
@@ -190,11 +238,15 @@ class MolecularNodeEncoder:
     def __init__(
         self,
         featurizers: list[featurizers.Featurizer],
+        supports_masking: bool = False,
     ) -> None:
         self.featurizer = Composer(featurizers)
+        self.supports_masking = supports_masking
 
     def __call__(self, molecule: types.Molecule) -> np.ndarray:
         node_encodings = np.stack([self.featurizer(atom) for atom in molecule.GetAtoms()], axis=0)
+        if self.supports_masking:
+            node_encodings = np.pad(node_encodings, [(0, 0), (0, 1)])
         return {
             "node_state": np.stack(node_encodings),
         }

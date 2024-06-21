@@ -29,7 +29,6 @@ def transform(
         state_transformed += bias
     return state_transformed
 
-
 def aggregate(
     node_state: types.Array,
     edge_src: types.Array,
@@ -83,6 +82,17 @@ def aggregate(
     )
     return node_state_updated
 
+def gather(
+    node_state: types.Array,
+    edge: types.Array,      
+) -> types.Array:
+    edge = keras.ops.cast(edge, "int32")
+    expected_rank = 2
+    current_rank = len(keras.ops.shape(edge))
+    for _ in range(expected_rank - current_rank):
+        edge = keras.ops.expand_dims(edge, axis=-1)
+    node_state_edge = keras.ops.take_along_axis(node_state, edge, axis=0)
+    return node_state_edge
 
 def segment_mean(
     data: types.Array,
