@@ -23,8 +23,15 @@ def transform(
     Returns:
         A transformed node state.
     """
-
-    state_transformed = keras.ops.matmul(state, kernel)
+    if len(keras.ops.shape(kernel)) == 2: 
+        # kernel.rank == state.rank == 2
+        state_transformed = keras.ops.matmul(state, kernel)
+    elif len(keras.ops.shape(kernel)) == len(keras.ops.shape(state)):
+        # kernel.rank == state.rank == 3 
+        state_transformed = keras.ops.einsum('ijh,jkh->ikh', state, kernel)
+    else:
+        # kernel.rank == 3 and state.rank == 2
+        state_transformed = keras.ops.einsum('ij,jkh->ikh', state, kernel)
     if bias is not None:
         state_transformed += bias
     return state_transformed
@@ -58,36 +65,43 @@ def aggregate(
     """
     num_nodes = keras.ops.shape(node_state)[0]
 
-    # Instead of casting to int, throw an error if not int?
-    edge_src = keras.ops.cast(edge_src, "int32")
-    edge_dst = keras.ops.cast(edge_dst, "int32")
-
-    expected_rank = 2
+    expected_rank = len(keras.ops.shape(node_state))
     current_rank = len(keras.ops.shape(edge_src))
     for _ in range(expected_rank - current_rank):
         edge_src = keras.ops.expand_dims(edge_src, axis=-1)
         edge_dst = keras.ops.expand_dims(edge_dst, axis=-1)
 
     node_state_src = keras.ops.take_along_axis(node_state, edge_src, axis=0)
+    
     if edge_weight is not None:
         node_state_src *= edge_weight
 
     if edge_state is not None:
         node_state_src += edge_state
 
-    edge_dst = keras.ops.squeeze(edge_dst, axis=-1)
+    edge_dst = keras.ops.squeeze(edge_dst)
 
     node_state_updated = keras.ops.segment_sum(
         data=node_state_src, segment_ids=edge_dst, num_segments=num_nodes, sorted=False
     )
     return node_state_updated
 
+def edge_softmax(score, edge_dst):
+    numerator = keras.ops.exp(score - keras.ops.max(score, axis=0, keepdims=True))
+    num_segments = keras.ops.max(edge_dst) + 1
+    denominator = keras.ops.segment_sum(numerator, edge_dst, num_segments, sorted=False)
+    expected_rank = len(keras.ops.shape(denominator))
+    current_rank = len(keras.ops.shape(edge_dst))
+    for _ in range(expected_rank - current_rank):
+        edge_dst = keras.ops.expand_dims(edge_dst, axis=-1)
+    denominator = keras.ops.take_along_axis(denominator, edge_dst, axis=0) 
+    return numerator / denominator
+
 def gather(
     node_state: types.Array,
     edge: types.Array,      
 ) -> types.Array:
-    edge = keras.ops.cast(edge, "int32")
-    expected_rank = 2
+    expected_rank = len(keras.ops.shape(node_state))
     current_rank = len(keras.ops.shape(edge))
     for _ in range(expected_rank - current_rank):
         edge = keras.ops.expand_dims(edge, axis=-1)

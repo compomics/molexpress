@@ -72,8 +72,8 @@ class GCNConv(BaseLayer):
         x = inputs.copy()
 
         node_state = x.pop("node_state")
-        edge_src = x["edge_src"]
-        edge_dst = x["edge_dst"]
+        edge_src = keras.ops.cast(x["edge_src"], "int32")
+        edge_dst = keras.ops.cast(x["edge_dst"], "int32")
         edge_state = x.get("edge_state")
         edge_weight = x.get("edge_weight")
 
