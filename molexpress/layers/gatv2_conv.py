@@ -111,7 +111,7 @@ class GATv2Conv(BaseLayer):
         edge_src = keras.ops.cast(x["edge_src"], "int32")
         edge_dst = keras.ops.cast(x["edge_dst"], "int32")
         edge_state = x.pop("edge_state", None)
-        edge_weight = x.get("edge_weight")
+        # edge_weight = x.get("edge_weight")
 
         if edge_state is None:
             attention_feature = keras.ops.concatenate([
