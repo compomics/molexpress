@@ -84,8 +84,8 @@ class PeptideGraphEncoder:
     @staticmethod
     def masked_collate_fn(
         data: list[types.MolecularGraph],
-        node_masking_rate: float = 0.25,
-        edge_masking_rate: float = 0.25,
+        node_masking_rate: float = 0.0,
+        edge_masking_rate: float = 0.0,
     ) -> tuple[types.MolecularGraph, np.ndarray]:
         """
         Merge list of graphs into a single disjoint graph.
