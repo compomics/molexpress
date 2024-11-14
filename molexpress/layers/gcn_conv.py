@@ -101,7 +101,7 @@ class GCNConv(BaseLayer):
         if self.skip_connection:
             if self._transform_skip_connection:
                 node_state = gnn_ops.transform(state=node_state, kernel=self.skip_connect_kernel)
-            node_state_updated += node_state
+            node_state_updated = node_state_updated + node_state
 
         if self.dropout_rate:
             node_state_updated = self.dropout(node_state_updated)

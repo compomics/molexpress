@@ -1,9 +1,8 @@
 lightning_logs/
 notebooks/_*.ipynb
-
+wandb/
 # vscode
 .vscode
-
 # jupyter
 MANIFEST
 build
@@ -157,3 +156,12 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+molexpress/**/*.ckpt
+molexpress/**/*.pth
+molexpress/**/*.txt
+molexpress/**/*.csv
+molexpress/**/*.zip
+
+
+
+

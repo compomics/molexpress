@@ -107,7 +107,7 @@ class GINConv(BaseLayer):
             edge_weight=edge_weight,
         )
 
-        node_state_updated += (1 + self.epsilon) * node_state
+        node_state_updated = node_state_updated +  (1 + self.epsilon) * node_state
 
         node_state_updated = gnn_ops.transform(
             state=node_state_updated, kernel=self.node_kernel_1, bias=self.node_bias_1

@@ -33,7 +33,7 @@ def transform(
         # kernel.rank == 3 and state.rank == 2
         state_transformed = keras.ops.einsum('ij,jkh->ikh', state, kernel)
     if bias is not None:
-        state_transformed += bias
+        state_transformed =state_transformed +  bias
     return state_transformed
 
 def aggregate(
@@ -71,13 +71,14 @@ def aggregate(
         edge_src = keras.ops.expand_dims(edge_src, axis=-1)
         edge_dst = keras.ops.expand_dims(edge_dst, axis=-1)
 
+    # print(edge_src.size(),node_state.size())
     node_state_src = keras.ops.take_along_axis(node_state, edge_src, axis=0)
     
     if edge_weight is not None:
         node_state_src *= edge_weight
 
     if edge_state is not None:
-        node_state_src += edge_state
+        node_state_src = node_state_src + edge_state
 
     edge_dst = keras.ops.squeeze(edge_dst)
 
