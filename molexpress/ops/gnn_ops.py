@@ -23,18 +23,19 @@ def transform(
     Returns:
         A transformed node state.
     """
-    if len(keras.ops.shape(kernel)) == 2: 
+    if len(keras.ops.shape(kernel)) == 2:
         # kernel.rank == state.rank == 2
         state_transformed = keras.ops.matmul(state, kernel)
     elif len(keras.ops.shape(kernel)) == len(keras.ops.shape(state)):
-        # kernel.rank == state.rank == 3 
-        state_transformed = keras.ops.einsum('ijh,jkh->ikh', state, kernel)
+        # kernel.rank == state.rank == 3
+        state_transformed = keras.ops.einsum("ijh,jkh->ikh", state, kernel)
     else:
         # kernel.rank == 3 and state.rank == 2
-        state_transformed = keras.ops.einsum('ij,jkh->ikh', state, kernel)
+        state_transformed = keras.ops.einsum("ij,jkh->ikh", state, kernel)
     if bias is not None:
-        state_transformed =state_transformed +  bias
+        state_transformed = state_transformed + bias
     return state_transformed
+
 
 def aggregate(
     node_state: types.Array,
@@ -71,9 +72,8 @@ def aggregate(
         edge_src = keras.ops.expand_dims(edge_src, axis=-1)
         edge_dst = keras.ops.expand_dims(edge_dst, axis=-1)
 
-    # print(edge_src.size(),node_state.size())
     node_state_src = keras.ops.take_along_axis(node_state, edge_src, axis=0)
-    
+
     if edge_weight is not None:
         node_state_src *= edge_weight
 
@@ -87,6 +87,7 @@ def aggregate(
     )
     return node_state_updated
 
+
 def edge_softmax(score, edge_dst):
     num_segments = keras.ops.maximum(keras.ops.max(edge_dst) + 1, 1)
     score_max = keras.ops.segment_max(score, edge_dst, num_segments, sorted=False)
@@ -96,9 +97,10 @@ def edge_softmax(score, edge_dst):
     denominator = gather(denominator, edge_dst)
     return numerator / denominator
 
+
 def gather(
     node_state: types.Array,
-    edge: types.Array,      
+    edge: types.Array,
 ) -> types.Array:
     expected_rank = len(keras.ops.shape(node_state))
     current_rank = len(keras.ops.shape(edge))
@@ -106,6 +108,7 @@ def gather(
         edge = keras.ops.expand_dims(edge, axis=-1)
     node_state_edge = keras.ops.take_along_axis(node_state, edge, axis=0)
     return node_state_edge
+
 
 def segment_mean(
     data: types.Array,

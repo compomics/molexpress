@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from functools import lru_cache
 from typing import Dict, Tuple, Union
 
@@ -8,6 +9,8 @@ import numpy as np
 from molexpress import types
 from molexpress.datasets import featurizers
 from molexpress.ops import chem_ops
+
+LOGGER = logging.getLogger(__name__)
 
 
 class PeptideGraphEncoder:
@@ -19,44 +22,35 @@ class PeptideGraphEncoder:
         supports_masking: bool = False,
     ) -> None:
         self.node_encoder = MolecularNodeEncoder(
-            atom_featurizers, supports_masking=supports_masking)
+            atom_featurizers, supports_masking=supports_masking
+        )
         self.edge_encoder = MolecularEdgeEncoder(
-            bond_featurizers, self_loops=self_loops, supports_masking=supports_masking)
+            bond_featurizers, self_loops=self_loops, supports_masking=supports_masking
+        )
 
     def __call__(self, residues: list[types.Molecule | types.SMILES | types.InChI]) -> np.ndarray:
         residue_graphs = []
         residue_sizes = []
-        # print(residues)
         for residue in residues:
             try:
                 residue_graph, residue_size = self._encode_residue(
                     residue, self.node_encoder, self.edge_encoder
                 )
-                # print("Printing residue graphs",residue_graph)
-            except Exception as e:
-                # print(residues)
-                print("Residues cannot be encoded properly")
-                # continue
+            except Exception:  # TODO: Specify exception(s)
+                LOGGER.error(f"Error in encoding residue {residue}. Skipping.")
 
             residue_graphs.append(residue_graph)
             residue_sizes.append(residue_size)
-        
-        #print(residues, residue_graphs)
-        # print(residue_graphs)
+
         disjoint_peptide_graph = self._merge_molecular_graphs(residue_graphs)
 
-        # print(disjoint_peptide_graph)
         try:
-           disjoint_peptide_graph["residue_size"] = np.array(residue_sizes)
+            disjoint_peptide_graph["residue_size"] = np.array(residue_sizes)
         except Exception as e:
-            # print(disjoint_peptide_graph)
-            print("Cannot construct disjoint graph")
-            raise e
+            raise GraphConstructionError("Cannot construct disjoint graph") from e
 
         disjoint_peptide_graph["peptide_size"] = np.array([len(residues)], dtype="int32")
         return disjoint_peptide_graph
-
-
 
     @staticmethod
     @lru_cache(maxsize=None)
@@ -116,7 +110,6 @@ class PeptideGraphEncoder:
         """
         disjoint_peptide_graphs = data
 
-
         disjoint_peptide_batch_graph = PeptideGraphEncoder._merge_molecular_graphs(
             disjoint_peptide_graphs
         )
@@ -127,42 +120,45 @@ class PeptideGraphEncoder:
             [g["residue_size"] for g in disjoint_peptide_graphs]
         ).astype("int32")
 
-
-        # print(disjoint_peptide_batch_graph)
-        node_state = disjoint_peptide_batch_graph['node_state']
+        node_state = disjoint_peptide_batch_graph["node_state"]
         node_mask = np.random.uniform(size=node_state.shape[0]) < node_masking_rate
-        disjoint_peptide_batch_graph['node_loss_weight'] = np.copy(node_mask.astype(node_state.dtype))
-        disjoint_peptide_batch_graph['node_label'] = np.copy(disjoint_peptide_batch_graph['node_state'])
+        disjoint_peptide_batch_graph["node_loss_weight"] = np.copy(
+            node_mask.astype(node_state.dtype)
+        )
+        disjoint_peptide_batch_graph["node_label"] = np.copy(
+            disjoint_peptide_batch_graph["node_state"]
+        )
         mask_state = np.zeros_like(node_state)
-        mask_state[:, -1] = 1.
-        disjoint_peptide_batch_graph['node_state'] = np.where(
-            node_mask[:, None], mask_state, node_state)
-        
-        edge_state = disjoint_peptide_batch_graph['edge_state']
+        mask_state[:, -1] = 1.0
+        disjoint_peptide_batch_graph["node_state"] = np.where(
+            node_mask[:, None], mask_state, node_state
+        )
+
+        edge_state = disjoint_peptide_batch_graph["edge_state"]
         edge_mask = np.random.uniform(size=edge_state.shape[0]) < edge_masking_rate
-        disjoint_peptide_batch_graph['edge_loss_weight'] = np.copy(edge_mask.astype(edge_state.dtype))
-        disjoint_peptide_batch_graph['edge_label'] = np.copy(disjoint_peptide_batch_graph['edge_state'])
+        disjoint_peptide_batch_graph["edge_loss_weight"] = np.copy(
+            edge_mask.astype(edge_state.dtype)
+        )
+        disjoint_peptide_batch_graph["edge_label"] = np.copy(
+            disjoint_peptide_batch_graph["edge_state"]
+        )
         mask_state = np.zeros_like(edge_state)
-        mask_state[:, -1] = 1.
-        disjoint_peptide_batch_graph['edge_state'] = np.where(
-            edge_mask[:, None], mask_state, edge_state)
-        # print(disjoint_peptide_batch_graph)
-                # residue_size = np.array([g["residue_size"] for g in molecular_graphs])
+        mask_state[:, -1] = 1.0
+        disjoint_peptide_batch_graph["edge_state"] = np.where(
+            edge_mask[:, None], mask_state, edge_state
+        )
+
         return disjoint_peptide_batch_graph
 
     @staticmethod
     def _merge_molecular_graphs(
         molecular_graphs: list[types.MolecularGraph],
     ) -> types.MolecularGraph:
-        # print(molecular_graphs)
-        # print([g for g in molecular_graphs])
-    
-
         num_nodes = np.array([g["node_state"].shape[0] for g in molecular_graphs])
 
         disjoint_molecular_graph = {}
 
-        if len(molecular_graphs)>0:
+        if len(molecular_graphs) > 0:
             disjoint_molecular_graph["node_state"] = np.concatenate(
                 [g["node_state"] for g in molecular_graphs]
             )
@@ -173,13 +169,11 @@ class PeptideGraphEncoder:
                         [g["edge_state"] for g in molecular_graphs]
                     )
                 except ValueError as e:
+                    raise GraphMergingError(
+                        "Error during concatenation. Structure without bonds? Shapes of edge_state arrays: "
+                        f"{[g['edge_state'].shape for g in molecular_graphs]}"
+                    ) from e
 
-                    print("Error is due to the presence of structures without any bonds, usually these are ions / atoms")
-                    print("Error during concatenation. Shapes of edge_state arrays:")
-                    print([g["edge_state"].shape for g in molecular_graphs])    
-                    
-                    raise e
-                
             edge_src = np.concatenate([graph["edge_src"] for graph in molecular_graphs])
             edge_dst = np.concatenate([graph["edge_dst"] for graph in molecular_graphs])
             num_edges = np.array([graph["edge_src"].shape[0] for graph in molecular_graphs])
@@ -189,7 +183,7 @@ class PeptideGraphEncoder:
 
             disjoint_molecular_graph["edge_src"] = edge_src + edge_incr
             disjoint_molecular_graph["edge_dst"] = edge_dst + edge_incr
-            
+
             return disjoint_molecular_graph
 
 
@@ -224,9 +218,9 @@ class Composer:
 
 class MolecularEdgeEncoder:
     def __init__(
-        self, 
-        featurizers: list[featurizers.Featurizer], 
-        self_loops: bool = False, 
+        self,
+        featurizers: list[featurizers.Featurizer],
+        self_loops: bool = False,
         supports_masking: bool = False,
     ) -> None:
         self.featurizer = Composer(featurizers)
@@ -260,13 +254,15 @@ class MolecularEdgeEncoder:
             if bond is None:
                 assert self.self_loops, "Found a bond to be None."
                 bond_encoding = np.zeros(
-                    self.output_dim + int(self.self_loops) + int(self.supports_masking), 
-                    dtype=self.output_dtype)
+                    self.output_dim + int(self.self_loops) + int(self.supports_masking),
+                    dtype=self.output_dtype,
+                )
                 bond_encoding[-(int(self.self_loops) + int(self.supports_masking))] = 1
             else:
                 bond_encoding = self.featurizer(bond)
                 bond_encoding = np.pad(
-                    bond_encoding, (0, int(self.self_loops) + int(self.supports_masking)))
+                    bond_encoding, (0, int(self.self_loops) + int(self.supports_masking))
+                )
 
             bond_encodings.append(bond_encoding)
 
@@ -275,7 +271,6 @@ class MolecularEdgeEncoder:
             "edge_dst": edge_dst,
             "edge_state": np.stack(bond_encodings),
         }
-
 
 
 class MolecularNodeEncoder:
@@ -288,11 +283,23 @@ class MolecularNodeEncoder:
         self.supports_masking = supports_masking
 
     def __call__(self, molecule: types.Molecule) -> np.ndarray:
-        
-        node_encodings = np.stack([self.featurizer(atom) for atom in molecule.GetAtoms() if molecule ], axis=0)
+        node_encodings = np.stack(
+            [self.featurizer(atom) for atom in molecule.GetAtoms() if molecule], axis=0
+        )
         if self.supports_masking:
             node_encodings = np.pad(node_encodings, [(0, 0), (0, 1)])
         return {
             "node_state": np.stack(node_encodings),
         }
 
+
+class GraphConstructionError(Exception):
+    """Error during graph construction."""
+
+    pass
+
+
+class GraphMergingError(Exception):
+    """Error during graph merging."""
+
+    pass
