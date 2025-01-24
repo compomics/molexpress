@@ -45,13 +45,25 @@ class GraphNeuralNetwork(torch.nn.Module):
         self.gcn2 = layers.GINConv(dim)
         self.gcn3 = layers.GINConv(dim)
         self.gcn4 = layers.GINConv(dim)
-        
+        self.gcn5 = layers.GINConv(dim)
+        self.gcn6 = layers.GINConv(dim)
+        self.readout = layers.ResidueReadout()
+        self.mode = "train"
+
     def forward(self, x):
         x = self.gcn1(x)
         x = self.gcn2(x)
         x = self.gcn3(x)
         x = self.gcn4(x)
-        return x
+        x = self.gcn5(x)
+        x = self.gcn6(x)
+        if self.mode == "train":
+            return x
+        elif self.mode == "inference":
+            return self.readout(x)
+
+    def set_mode(self, mode):
+        self.mode = mode
 
 
 class NodePrediction(torch.nn.Module):
@@ -99,7 +111,7 @@ class GraphDataset(torch.utils.data.Dataset):
 
 class GraphModelModule(pl.LightningModule):
     
-    def __init__(self, graph_model, node_pred_model, edge_pred_model, lr=1e-3):
+    def __init__(self, graph_model, node_pred_model, edge_pred_model, lr=1e-7):
         super().__init__()
         self.graph_model = graph_model
         self.node_pred_model = node_pred_model
@@ -139,18 +151,18 @@ class GraphModelModule(pl.LightningModule):
 
  
     def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(
+        optimizer = torch.optim.Adam(
             list(self.graph_model.parameters()) + 
             list(self.node_pred_model.parameters()) + 
             list(self.edge_pred_model.parameters()), 
-            lr=self.lr,weight_decay=1e-2
+            lr=self.lr,
         )
         return optimizer
 
     def weighted_loss(self, pred, true, weight):
         log = torch.sigmoid(pred)    # Sigmoid() only with BCELoss
         true = torch.from_numpy(true)
-        true  = true.to("cuda")
+        true  = true.to("cuda") 
         weight = torch.from_numpy(weight)
         weight = weight.to("cuda")
         assert true.shape ==log.shape, f"Expected the two inputs to have the same shape"
@@ -163,12 +175,12 @@ class GraphModelModule(pl.LightningModule):
 
 
 
-graph_model = GraphNeuralNetwork(512)
-node_pred_model = NodePrediction(512, 11)
-edge_pred_model = EdgePrediction(512 * 2, 6)
+graph_model = GraphNeuralNetwork(1280)
+node_pred_model = NodePrediction(1280, 11)
+edge_pred_model = EdgePrediction(1280 * 2, 6)
 
 model = GraphModelModule.load_from_checkpoint(
-    "model_checkpoint_adam_dim512.ckpt",
+    "/home/harikrishnan/molexpress/molexpress/pretraining/model_checkpoint_6_layers_dim1280.ckpt",
     graph_model=graph_model,
     node_pred_model=node_pred_model,
     edge_pred_model=edge_pred_model,
@@ -215,7 +227,7 @@ trainer = pl.Trainer(
 trainer.fit(model, train_loader, val_loader)
 
 # Save model checkpoint
-trainer.save_checkpoint("finetuned_model_adam_dim512.ckpt")
+trainer.save_checkpoint("finetuned_model_6_l_d_1280_adam.ckpt")
 
 
 

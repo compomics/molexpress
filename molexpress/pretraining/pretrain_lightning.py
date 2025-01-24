@@ -1,11 +1,12 @@
 import os
-os.environ["KERAS_BACKEND"] = "torch" 
+# os.environ["KERAS_BACKEND"] = "torch" 
 
 from functools import partial
 from molexpress import layers
 from molexpress.datasets import featurizers
 from molexpress.datasets import encoders
 from molexpress.ops.chem_ops import get_molecule
+from molexpress.types import gr
 import torch
 import pandas as pd 
 import pytorch_lightning as pl
@@ -16,6 +17,8 @@ from tqdm import tqdm
 from pytorch_lightning.callbacks import EarlyStopping, LearningRateMonitor
 from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR, OneCycleLR
 from lightning.pytorch.tuner import Tuner
+import tensorflow as tf 
+
 
 
 atom_featurizers = [
@@ -156,25 +159,7 @@ class GraphModelModule(pl.LightningModule):
             list(self.edge_pred_model.parameters()), 
             lr=self.lr,
         )
-        # schedulers = [
-        #     # ReduceLROnPlateau
-        #     {
-        #         'scheduler': ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, min_lr=1e-6),
-        #         'monitor': 'val_loss'
-        #     },
-        #     # CosineAnnealingLR
-        #     {
-        #         'scheduler': CosineAnnealingLR(optimizer, T_max=10, eta_min=1e-6),
-        #         'interval': 'epoch'
-        #     },
-        #     # OneCycleLR
-        #     {
-        #         'scheduler': OneCycleLR(optimizer, max_lr=self.lr, steps_per_epoch=len(train_loader), epochs=100),
-        #         'interval': 'step'
-        #     }
-        # ]
 
-        # return [optimizer], schedulers
         return optimizer
     
 
