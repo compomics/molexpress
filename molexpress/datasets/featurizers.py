@@ -8,7 +8,6 @@ from rdkit.Chem import Crippen, Lipinski, rdMolDescriptors, rdPartialCharges
 
 from molexpress import types
 
-
 DEFAULT_VOCABULARY = {
     "AtomType": {
         'H',  'He', 'Li', 'Be', 'B',  'C',  'N',  'O',  'F',  'Ne',
