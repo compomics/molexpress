@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from functools import lru_cache
 from typing import Dict, Tuple, Union
 
 import numpy as np
@@ -36,11 +35,13 @@ class PeptideGraphEncoder:
                 residue_graph, residue_size = self._encode_residue(
                     residue, self.node_encoder, self.edge_encoder
                 )
-            except Exception:  # TODO: Specify exception(s)
-                LOGGER.error(f"Error in encoding residue {residue}. Skipping.")
-
-            residue_graphs.append(residue_graph)
-            residue_sizes.append(residue_size)
+            except AttributeError as e:
+                raise GraphConstructionError(
+                    f"Could not construct graph from residue: {residue}"
+                ) from e
+            else:
+                residue_graphs.append(residue_graph)
+                residue_sizes.append(residue_size)
 
         disjoint_peptide_graph = self._merge_molecular_graphs(residue_graphs)
 
@@ -53,7 +54,6 @@ class PeptideGraphEncoder:
         return disjoint_peptide_graph
 
     @staticmethod
-    @lru_cache(maxsize=None)
     def _encode_residue(
         residue: types.Molecule | types.SMILES | types.InChI,
         node_encoder: MolecularNodeEncoder,
@@ -158,33 +158,35 @@ class PeptideGraphEncoder:
 
         disjoint_molecular_graph = {}
 
-        if len(molecular_graphs) > 0:
-            disjoint_molecular_graph["node_state"] = np.concatenate(
-                [g["node_state"] for g in molecular_graphs]
-            )
+        if len(molecular_graphs) == 0:
+            raise GraphMergingError("No graphs to merge.")
 
-            if "edge_state" in molecular_graphs[0]:
-                try:
-                    disjoint_molecular_graph["edge_state"] = np.concatenate(
-                        [g["edge_state"] for g in molecular_graphs]
-                    )
-                except ValueError as e:
-                    raise GraphMergingError(
-                        "Error during concatenation. Structure without bonds? Shapes of edge_state arrays: "
-                        f"{[g['edge_state'].shape for g in molecular_graphs]}"
-                    ) from e
+        disjoint_molecular_graph["node_state"] = np.concatenate(
+            [g["node_state"] for g in molecular_graphs]
+        )
 
-            edge_src = np.concatenate([graph["edge_src"] for graph in molecular_graphs])
-            edge_dst = np.concatenate([graph["edge_dst"] for graph in molecular_graphs])
-            num_edges = np.array([graph["edge_src"].shape[0] for graph in molecular_graphs])
-            indices = np.repeat(range(len(molecular_graphs)), num_edges)
-            edge_incr = np.concatenate([[0], num_nodes[:-1]])
-            edge_incr = np.take_along_axis(edge_incr, indices, axis=0)
+        if "edge_state" in molecular_graphs[0]:
+            try:
+                disjoint_molecular_graph["edge_state"] = np.concatenate(
+                    [g["edge_state"] for g in molecular_graphs]
+                )
+            except ValueError as e:
+                raise GraphMergingError(
+                    "Error during concatenation. Structure without bonds? Shapes of edge_state arrays: "
+                    f"{[g['edge_state'].shape for g in molecular_graphs]}"
+                ) from e
 
-            disjoint_molecular_graph["edge_src"] = edge_src + edge_incr
-            disjoint_molecular_graph["edge_dst"] = edge_dst + edge_incr
+        edge_src = np.concatenate([graph["edge_src"] for graph in molecular_graphs])
+        edge_dst = np.concatenate([graph["edge_dst"] for graph in molecular_graphs])
+        num_edges = np.array([graph["edge_src"].shape[0] for graph in molecular_graphs])
+        indices = np.repeat(range(len(molecular_graphs)), num_edges)
+        edge_incr = np.concatenate([[0], num_nodes[:-1]])
+        edge_incr = np.take_along_axis(edge_incr, indices, axis=0)
 
-            return disjoint_molecular_graph
+        disjoint_molecular_graph["edge_src"] = edge_src + edge_incr
+        disjoint_molecular_graph["edge_dst"] = edge_dst + edge_incr
+
+        return disjoint_molecular_graph
 
 
 class Composer:
@@ -284,7 +286,7 @@ class MolecularNodeEncoder:
 
     def __call__(self, molecule: types.Molecule) -> np.ndarray:
         node_encodings = np.stack(
-            [self.featurizer(atom) for atom in molecule.GetAtoms() if molecule], axis=0
+            [self.featurizer(atom) for atom in molecule.GetAtoms()], axis=0
         )
         if self.supports_masking:
             node_encodings = np.pad(node_encodings, [(0, 0), (0, 1)])

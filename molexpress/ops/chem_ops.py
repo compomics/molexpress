@@ -7,31 +7,30 @@ from molexpress import types
 
 
 def get_molecule(
-    molecule: types.Molecule | types.SMILES | types.InChI,
+    input_molecule: types.Molecule | types.SMILES | types.InChI,
     catch_errors: bool = False,
 ) -> Chem.Mol | None:
     """Generates an molecule object."""
 
-    if isinstance(molecule, Chem.Mol):
-        return molecule
+    if isinstance(input_molecule, Chem.Mol):
+        return input_molecule
 
-    string = molecule
-
-    if string.startswith("InChI"):
-        molecule = Chem.MolFromInchi(string, sanitize=False)
+    if input_molecule.startswith("InChI"):
+        molecule = Chem.MolFromInchi(input_molecule, sanitize=False)
     else:
-        molecule = Chem.MolFromSmiles(string, sanitize=False)
+        molecule = Chem.MolFromSmiles(input_molecule, sanitize=False)
 
-    if molecule is None:
-        raise ValueError(f"{string!r} is invalid.")
+    if not molecule:
+        raise ValueError(f"{input_molecule!r} is invalid.")
 
     flag = Chem.SanitizeMol(molecule, catchErrors=True)
     if flag != Chem.SanitizeFlags.SANITIZE_NONE:
-        if not catch_errors:
-            return None
-        # Sanitize molecule again, without the sanitization step that caused
-        # the error previously. Unrealistic molecules might pass without an error.
-        Chem.SanitizeMol(molecule, sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL ^ flag)
+        if catch_errors:
+            raise ValueError(f"{input_molecule!r} is invalid.")
+        else:
+            # Sanitize molecule again, without the sanitization step that caused
+            # the error previously. Unrealistic molecules might pass without an error.
+            Chem.SanitizeMol(molecule, sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL ^ flag)
 
     Chem.AssignStereochemistry(molecule, cleanIt=True, force=True, flagPossibleStereoCenters=True)
 
